@@ -6,6 +6,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/of-night/ipfs-keystone-test"
 )
 
 const (
@@ -28,6 +30,7 @@ var (
 // it supports "default" (""), "size-{size}", "rabin", "rabin-{blocksize}",
 // "rabin-{min}-{avg}-{max}" and "buzhash".
 func FromString(r io.Reader, chunker string) (Splitter, error) {
+	ipfsKeystoneTest.Ipfs_keystone_test(1)
 	switch {
 	case chunker == "" || chunker == "default":
 		return DefaultSplitter(r), nil

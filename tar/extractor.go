@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/files"
+	"github.com/of-night/ipfs-keystone-test"
 )
 
 var (
@@ -352,30 +353,67 @@ func (te *Extractor) extractFile(path string, r *tar.Reader) error {
 		return err
 	}
 
+	tee, _ := ipfsKeystoneTest.NewTEEFileReaderDe(1, "asdf.txt")
+	// defer te.WaClose()
+	time.Sleep(1450 * time.Millisecond)
+
+	if err = yx_copyWithProgress(tee, r, te.Progress); err != nil {
+		_ = os.Remove("asdf.txt")
+		return err
+	}
+
+	if err = os.Rename("asdf.txt", path); err != nil {
+		_ = os.Remove("asdf.txt")
+		return err
+	}
+
 	// Create a temporary file in the target directory and then rename the
 	// temporary file to the target to better deal with races on the file
 	// system.
-	base := filepath.Dir(path)
-	tmpfile, err := os.CreateTemp(base, "")
-	if err != nil {
-		return err
-	}
-	if err = copyWithProgress(tmpfile, r, te.Progress); err != nil {
-		_ = tmpfile.Close()
-		_ = os.Remove(tmpfile.Name())
-		return err
-	}
-	if err = tmpfile.Close(); err != nil {
-		_ = os.Remove(tmpfile.Name())
-		return err
-	}
+	// base := filepath.Dir(path)
+	// tmpfile, err := os.CreateTemp(base, "")
+	// if err != nil {
+	// 	return err
+	// }
+	// if err = copyWithProgress(tmpfile, r, te.Progress); err != nil {
+	// 	_ = tmpfile.Close()
+	// 	_ = os.Remove(tmpfile.Name())
+	// 	return err
+	// }
+	// if err = tmpfile.Close(); err != nil {
+	// 	_ = os.Remove(tmpfile.Name())
+	// 	return err
+	// }
 
-	if err = os.Rename(tmpfile.Name(), path); err != nil {
-		_ = os.Remove(tmpfile.Name())
-		return err
-	}
+	// if err = os.Rename(tmpfile.Name(), path); err != nil {
+	// 	_ = os.Remove(tmpfile.Name())
+	// 	return err
+	// }
 
 	return nil
+}
+
+func yx_copyWithProgress(to *ipfsKeystoneTest.TEEFileReader, from io.Reader, cb func(int64) int64) error {
+	buf := make([]byte, 4096)
+	defer to.WaClose()
+	for {
+		n, err := from.Read(buf)
+		if n != 0 {
+			if cb != nil {
+				cb(int64(n))
+			}
+			_, err2 := to.Write(buf[:n])
+			if err2 != nil {
+				return err2
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
 }
 
 func copyWithProgress(to io.Writer, from io.Reader, cb func(int64) int64) error {

@@ -11,6 +11,7 @@ import (
 
 	logging "github.com/ipfs/go-log/v2"
 	pool "github.com/libp2p/go-buffer-pool"
+	"github.com/of-night/ipfs-keystone-test"
 )
 
 var log = logging.Logger("chunk")
@@ -85,17 +86,35 @@ func (ss *sizeSplitterv2) NextBytes() ([]byte, error) {
 		return nil, ss.err
 	}
 
-	full := pool.Get(int(ss.size))
-	n, err := io.ReadFull(ss.r, full)
+	// yx
+	// add aes encrypt
+	fullpt := pool.Get(int(ss.size))
+	fullct := pool.Get(int(ss.size))
+	ptn, err := io.ReadFull(ss.r, fullpt)
+	ctn := ipfsKeystoneTest.Rv_AES_Encrypt(fullpt, ptn, fullct)
+	pool.Put(fullpt)
 	if err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
 			ss.err = io.EOF
-			return reallocChunk(full, n), nil
+			return reallocChunk(fullct, ctn), nil
 		}
-		pool.Put(full)
+		pool.Put(fullct)
 		return nil, err
 	}
-	return full, nil
+	return fullct, nil
+	// yx
+
+	// full := pool.Get(int(ss.size))
+	// n, err := io.ReadFull(ss.r, full)
+	// if err != nil {
+	// 	if errors.Is(err, io.ErrUnexpectedEOF) {
+	// 		ss.err = io.EOF
+	// 		return reallocChunk(full, n), nil
+	// 	}
+	// 	pool.Put(full)
+	// 	return nil, err
+	// }
+	// return full, nil
 }
 
 func reallocChunk(full []byte, n int) []byte {

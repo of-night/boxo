@@ -353,19 +353,45 @@ func (te *Extractor) extractFile(path string, r *tar.Reader) error {
 		return err
 	}
 
-	tee, _ := ipfsKeystoneTest.NewTEEFileReaderDe(1, "asdf.txt")
-	// defer te.WaClose()
-	time.Sleep(1450 * time.Millisecond)
-
-	if err = yx_copyWithProgress(tee, r, te.Progress); err != nil {
-		_ = os.Remove("asdf.txt")
+	// yx
+	// aes decrypt
+	base := filepath.Dir(path)
+	tmpfile, err := os.CreateTemp(base, "")
+	if err != nil {
+		return err
+	}
+	if err = yx_rvaes_copyWithProgress(tmpfile, r, te.Progress); err != nil {
+		_ = tmpfile.Close()
+		_ = os.Remove(tmpfile.Name())
+		return err
+	}
+	if err = tmpfile.Close(); err != nil {
+		_ = os.Remove(tmpfile.Name())
 		return err
 	}
 
-	if err = os.Rename("asdf.txt", path); err != nil {
-		_ = os.Remove("asdf.txt")
+	if err = os.Rename(tmpfile.Name(), path); err != nil {
+		_ = os.Remove(tmpfile.Name())
 		return err
 	}
+	// yx
+
+	// yx
+	// Keystone aes decrypt
+	// tee, _ := ipfsKeystoneTest.NewTEEFileReaderDe(1, "asdf.txt")
+	// // defer te.WaClose()
+	// time.Sleep(1450 * time.Millisecond)
+
+	// if err = yx_copyWithProgress(tee, r, te.Progress); err != nil {
+	//	_ = os.Remove("asdf.txt")
+	//	return err
+	// }
+
+	// if err = os.Rename("asdf.txt", path); err != nil {
+	//	_ = os.Remove("asdf.txt")
+	//	return err
+	// }
+	// yx
 
 	// Create a temporary file in the target directory and then rename the
 	// temporary file to the target to better deal with races on the file
@@ -403,6 +429,30 @@ func yx_copyWithProgress(to *ipfsKeystoneTest.TEEFileReader, from io.Reader, cb 
 				cb(int64(n))
 			}
 			_, err2 := to.Write(buf[:n])
+			if err2 != nil {
+				return err2
+			}
+		}
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
+}
+
+func yx_rvaes_copyWithProgress(to io.Writer, from io.Reader, cb func(int64) int64) error {
+	ctbuf := make([]byte, 4096)
+	ptbuf := make([]byte, 4096)
+	for {
+		n, err := from.Read(ctbuf)
+		ptn := ipfsKeystoneTest.Rv_AES_Decrypt(ctbuf, n, ptbuf)
+		if n != 0 {
+			if cb != nil {
+				cb(int64(n))
+			}
+			_, err2 := to.Write(ptbuf[:ptn])
 			if err2 != nil {
 				return err2
 			}
